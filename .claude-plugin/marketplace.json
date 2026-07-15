@@ -1,0 +1,35 @@
+{
+  "name": "qa-code-review-test",
+  "owner": {
+    "name": "Abhijeet Dhumal"
+  },
+  "metadata": {
+    "description": "Test marketplace for dry-running the qa-code-review plugin via unagi before merging to the official NiCE Agentic Platform marketplace.",
+    "totalPlugins": 1
+  },
+  "plugins": [
+    {
+      "name": "qa-code-review",
+      "source": "./plugin/qa-code-review",
+      "description": "Framework-agnostic QA automation code review agent. Reviews a PR/MR against composable framework standards (Playwright TS/JS, Selenium-Java, BDD/Cucumber), posts a scored feedback comment, auto-fixes the findings, pushes to the same branch, and re-reviews. Works with Claude or GitHub Models (Copilot-family).",
+      "version": "1.0.0-rc1",
+      "keywords": [
+        "code-review",
+        "qa",
+        "test-automation",
+        "playwright",
+        "selenium",
+        "cucumber",
+        "bdd",
+        "auto-fix",
+        "pull-request",
+        "llm"
+      ],
+      "author": {
+        "name": "Abhijeet Dhumal",
+        "email": "abhijeet.dhumal@nice.com",
+        "github": "nice-abhijeet-dhumal"
+      }
+    }
+  ]
+}
