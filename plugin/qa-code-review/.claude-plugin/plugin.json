@@ -1,6 +1,6 @@
 {
   "name": "qa-code-review",
-  "description": "Framework-agnostic QA automation code review agent. Reviews a PR/MR against composable framework standards (Playwright TS/JS, Selenium-Java, BDD/Cucumber), posts a scored feedback comment, auto-fixes the findings, pushes to the same branch, and re-reviews. Works with Claude or GitHub Models (Copilot-family).",
+  "description": "Review my unstaged changes with the qa-code-review standards, then auto-fix all Critical/High findings in place and re-review - don't push.",
   "version": "1.0.0-rc1",
   "author": {
     "name": "Abhijeet Dhumal",
