@@ -1,6 +1,6 @@
 ---
 name: qa-code-review
-description: Framework-agnostic QA automation code reviewer. Reviews a PR/MR against composable framework standards, posts a scored feedback comment, auto-fixes findings, pushes to the same branch, and re-reviews. Runs standalone Python skill scripts (deterministic regex + LLM via Claude or GitHub Models) — no MCP server required.
+description: Review my unstaged changes with the qa-code-review standards, then auto-fix all Critical/High findings in place and re-review - don't push.
 ---
 
 # QA Code Review Agent
