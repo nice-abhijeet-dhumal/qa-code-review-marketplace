@@ -63,7 +63,7 @@ pr_mr_orchestrator.py                                    (entrypoint)
   ├─ deterministic_review.py  .compute_score() + .format_report()
   ├─ adapter.post_comment(report)             → one PR/MR comment posted
   │
-  │   ── loop while AUTO_FIX and score < SCORE_THRESHOLD, max 3 (MAX_FIX_ITERATIONS) ──
+  │   ── loop while AUTO_FIX and Critical/High findings remain, max 3 (MAX_FIX_ITERATIONS) ──
   │
   ├─ llm_client.py  .choose_provider()         → claude | github | none
   ├─ llm_auto_fix.py  .build_fixes(findings, repo_root, standard, provider)
@@ -193,15 +193,16 @@ GITLAB_PERSONAL_ACCESS_TOKEN="..." REPO_ROOT="$(pwd)" \
 AUTO_FIX="true" python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_mr_orchestrator.py"
 ```
 The platform is auto-detected from the env vars present. This posts one
-review comment, then — if `AUTO_FIX=true` and the score is below
-`SCORE_THRESHOLD` — fixes, pushes, and re-reviews, up to `MAX_FIX_ITERATIONS`
-(default 3) times. See
+review comment, then — if `AUTO_FIX=true` and any Critical/High findings
+remain — fixes, pushes, and re-reviews, up to `MAX_FIX_ITERATIONS`
+(default 3) times. `SCORE_THRESHOLD` never gates this loop; it only affects
+the verdict wording once no Critical/High findings are left. See
 [agents/qa-code-review.agent.md](agents/qa-code-review.agent.md) for the full
 Request → Script mapping and every configuration variable.
 
 ## Guardrails (retries capped at 3, every level)
 
-- **PR/MR-level**: `MAX_FIX_ITERATIONS` (default 3) review→fix→re-review rounds, stop at `SCORE_THRESHOLD` (default 80).
+- **PR/MR-level**: `MAX_FIX_ITERATIONS` (default 3) review→fix→re-review rounds, stop once no Critical/High findings remain (the pipeline gate itself never keys off `SCORE_THRESHOLD`, default 80 — that only picks the verdict wording).
 - **API/push-level**: `API_MAX_RETRIES` (default 3) for transient GitHub/GitLab API calls and the fix-commit push.
 - **Agent-level**: the local Claude Code agent flow retries a failed detect→review→fix→push attempt up to 3 times total.
 - **Verify-before-commit gate** — deterministic Critical/High can only decrease.

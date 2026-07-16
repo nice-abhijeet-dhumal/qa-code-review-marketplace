@@ -79,10 +79,13 @@ retry more than 3 times.
    gate, commit as bot.
 5. **Push** to the same PR/MR source branch, then **re-review** (back to step 2).
 
-**PR-level retry (max 3, `MAX_FIX_ITERATIONS`):** steps 2-5 repeat until the
-score clears `SCORE_THRESHOLD` or 3 iterations are spent, whichever comes
+**PR-level retry (max 3, `MAX_FIX_ITERATIONS`):** steps 2-5 repeat until no
+Critical/High findings remain or 3 iterations are spent, whichever comes
 first — this is `pr_mr_orchestrator.py`'s built-in loop, already enforced by the
-script; do not add a second loop around it.
+script; do not add a second loop around it. `SCORE_THRESHOLD` never gates this
+loop or the pipeline pass/fail result — the gate is Critical/High count alone;
+the threshold only picks the verdict wording ("Approve" vs "Approve with
+comments") once zero Critical/High findings are left.
 
 **API/push retry (max 3, `API_MAX_RETRIES`):** each GitHub/GitLab API call and
 the fix-commit push retries transient failures up to 3 times internally
@@ -132,7 +135,7 @@ subdirectories, so `ui/`, `api/`-style monorepos are detected correctly).
 | `AUTO_FIX` | No | `true` to enable the fix loop (default `false`) |
 | `MAX_FIX_ITERATIONS` | No | PR-level retry cap (default `3`) |
 | `API_MAX_RETRIES` | No | API/push retry cap (default `3`) |
-| `SCORE_THRESHOLD` | No | Stop when deterministic score ≥ this (default `80`) |
+| `SCORE_THRESHOLD` | No | Verdict wording cutoff once no Critical/High findings remain (default `80`) — never gates the fix loop or pass/fail |
 | `BOT_NAME` / `BOT_EMAIL` | No | Identity for auto-fix commits |
 
 ## Skills
