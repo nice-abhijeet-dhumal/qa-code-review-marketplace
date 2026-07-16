@@ -37,6 +37,11 @@ CRITICAL_PATTERNS = [
     # Universal rule 3: no committed debugger/pause calls that hang CI.
     (r"page\.pause\s*\(\s*\)", "page.pause() committed -- remove before merging, it hangs CI"),
     (r"(?<![.\w])debugger\s*;", "debugger; statement committed -- remove before merging"),
+
+    # Universal rule 6: hardcoded secrets ship a credential -- severity table
+    # classifies this as Critical ("ships a secret"); keep in sync with that.
+    (r"(password|secret|token|apikey)\s*[:=]\s*['\"][^'\"]{4,}['\"]",
+     "Possible hardcoded credential -- use config or environment variables"),
 ]
 
 HIGH_PATTERNS = [
@@ -61,15 +66,11 @@ HIGH_PATTERNS = [
 
     # Universal rule 7: no hardcoded environment URLs.
     (r"https?://[a-zA-Z0-9._-]+\.(livevox|com|net|io)/", "Hardcoded URL -- import from config instead"),
-
-    # Universal rule 6: no hardcoded secrets.
-    (r"(password|secret|token|apikey)\s*[:=]\s*['\"][^'\"]{4,}['\"]",
-     "Possible hardcoded credential -- use config or environment variables"),
 ]
 
 MEDIUM_PATTERNS = [
     # Universal rule 10: no debug leftovers.
-    (r"console\.(log|warn|error|info)\s*\(", "console.log left in code -- remove before merging"),
+    (r"console\.(log|warn|error|info|debug)\s*\(", "console.log left in code -- remove before merging"),
     (r"System\.out\.print", "System.out.println left in code -- use the logging framework"),
     (r"^\s*print\s*\(", "print() left in code -- use the logging framework"),
 
