@@ -16,7 +16,7 @@ the active driver overlay's script) already reported.
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/review.py` | Deterministic patterns for the universal rules below (`CRITICAL_PATTERNS`, `HIGH_PATTERNS`, `MEDIUM_PATTERNS`, `LOW_PATTERNS`). Loaded and merged with the active driver overlay's own `scripts/review.py` by `review-engine`'s `deterministic_review.py`. Always loaded, regardless of detected framework. |
+| `scripts/review.py` | Deterministic patterns for the universal rules below (`CRITICAL_PATTERNS`, `HIGH_PATTERNS`, `MEDIUM_PATTERNS`, `LOW_PATTERNS`). Each pattern is a `Check(id, rule, suggestion, regex, scope, flags)` namedtuple -- `id` is the stable identifier used throughout this doc (e.g. `CORE-6`); `scope`/`flags` replace the old ad-hoc substring-matching on rule text with explicit fields (see `deterministic_review.py`'s `_scope_allows`/`_flag_excludes`). Loaded and merged with the active driver overlay's own `scripts/review.py` by `review-engine`'s `deterministic_review.py`. Always loaded, regardless of detected framework. |
 
 ## Severity model
 
@@ -32,36 +32,43 @@ Score starts at 100. Verdict: `>=90` Approve, `75-89` Approve with comments,
 
 ## Universal rules (all frameworks)
 
-1. **No swallowed errors.** Empty `catch {}` blocks hide real failures. (Critical)
+Each rule's id (e.g. `CORE-6`) is the stable identifier that
+`scripts/review.py` tags its findings with -- grep for the id in that file to
+find the exact regex enforcing it. IDs are how this doc and the script are
+kept mechanically verifiable against each other, not just by inspection.
+
+1. **No swallowed errors.** Empty `catch {}` blocks hide real failures. (Critical, `CORE-1`)
 2. **No hardcoded/blind sleeps.** Fixed waits (`sleep`, `waitForTimeout`,
-   `Thread.sleep`) are flaky. Use explicit waits / auto-retrying assertions. (Critical for >1s, Medium otherwise)
+   `Thread.sleep`) are flaky. Use explicit waits / auto-retrying assertions. (Critical for >1s, Medium otherwise, `CORE-2`)
 3. **No committed debugger/pause calls** that hang CI (`page.pause()`,
-   `debugger;`, breakpoints). (Critical)
-4. **No real assertions commented out.** A disabled assertion is a silent gap. (Critical)
-5. **No empty test bodies.** A test with no steps passes meaninglessly. (Critical)
+   `debugger;`, breakpoints). (Critical, `CORE-3`)
+4. **No real assertions commented out.** A disabled assertion is a silent gap. (Critical, `CORE-4`)
+5. **No empty test bodies.** A test with no steps passes meaninglessly. (Critical, `CORE-5`)
 6. **No hardcoded secrets.** Passwords, tokens, API keys, or credentials in
-   source. Use config/env/secret stores. Encrypted vault values are allowed. (Critical)
-7. **No hardcoded environment URLs** in test/page code — import from config. (High)
+   source. Use config/env/secret stores. Encrypted vault values are allowed. (Critical, `CORE-6`)
+7. **No hardcoded environment URLs** in test/page code — import from config. (High, `CORE-7`)
 8. **Skipped tests need a ticket reference** (e.g. `LV-1234`, `JIRA-xxx`) in a
-   comment, so the skip is tracked. (High)
+   comment, so the skip is tracked. (High, `CORE-8`)
 9. **Page Object Model boundaries.** Locators live in page objects, never in
    specs. Value assertions (business expectations) live in specs, never in page
-   objects. Visibility/enabled waits inside page objects are allowed. (High)
-10. **No debug leftovers** (`console.log`, `System.out.println`, print). (Medium)
+   objects. Visibility/enabled waits inside page objects are allowed. (High, `CORE-9`)
+10. **No debug leftovers** (`console.log`, `System.out.println`, print). (Medium, `CORE-10`)
 11. **No fragile locators** — index-based (`nth(0)`, `:first-child`),
-    absolute XPath, or auto-generated dynamic IDs. Prefer stable attributes. (High)
-12. **Track TODO/FIXME/HACK** with a ticket reference. (Low)
+    absolute XPath, or auto-generated dynamic IDs. Prefer stable attributes. (High, `CORE-11`)
+12. **Track TODO/FIXME/HACK** with a ticket reference. (Low, `CORE-12`)
 
 ## Additional checks (Medium)
 
 Implementation-level checks not tied to a specific numbered rule above:
 
-- **Config import path convention.** Imports from `../../config` must come
-  from `src/config/stg4` or `src/config/tst2`, not a bare `../../config`.
-- **Page class location.** A class named `*Page` should live under a
-  `pages/`/`page-objects/` folder.
-- **Non-ASCII characters in comments.** Keep comments plain ASCII (box-drawing
-  separators and em/en-dashes are excluded as common intentional decorators).
+- **Config import path convention** (`CORE-CONFIG-PATH`). Imports from
+  `../../config` must come from `src/config/stg4` or `src/config/tst2`, not a
+  bare `../../config`.
+- **Page class location** (`CORE-PAGE-CLASS-LOC`). A class named `*Page`
+  should live under a `pages/`/`page-objects/` folder.
+- **Non-ASCII characters in comments** (`CORE-NONASCII-COMMENT`). Keep
+  comments plain ASCII (box-drawing separators and em/en-dashes are excluded
+  as common intentional decorators).
 
 ## Review / fix contract
 
