@@ -30,7 +30,9 @@ Applied together with `qa-review-core`.
   test, not the page object.
 - **Fragile locators:** absolute XPath (`/html/body/div[2]/...`), index-based
   XPath (`(...)[1]`), or locating by volatile auto-generated ids.
-- **Hardcoded credentials / URLs** — use a properties file, env, or config class.
+- **Hardcoded URLs** — use a properties file, env, or config class. (Hardcoded
+  *credentials* are a `qa-review-core` rule and are **Critical**, not High —
+  see qa-review-core's severity model; encrypted vault values are allowed.)
 - **`@Ignore` / `@Disabled` without a ticket reference.**
 - **Implicit + explicit waits mixed** on the same driver — unpredictable timing.
 
@@ -39,8 +41,13 @@ Applied together with `qa-review-core`.
 - **`System.out.println`** debug output — use the logging framework (SLF4J/Log4j).
 - **New `WebDriver` created per test method** instead of a managed
   fixture/`@BeforeEach` + `@AfterEach` teardown — leaks browser sessions.
-- **Missing `driver.quit()`** in teardown — leaks processes.
 - **Raw `Thread`/timing constants** scattered instead of centralized config.
+
+> **Not currently automated:** missing `driver.quit()` in teardown, and
+> missing `@DisplayName`/grouping tags (below) require whole-file/whole-class
+> reasoning that the line-based regex engine can't do reliably. Treat these as
+> manual-review guidance until a dedicated check is built, not as things the
+> pipeline will flag.
 
 ## Low
 

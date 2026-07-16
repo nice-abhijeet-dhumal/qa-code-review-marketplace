@@ -31,9 +31,10 @@ MEDIUM_PATTERNS = [
     (r"new\s+(ChromeDriver|FirefoxDriver|RemoteWebDriver|EdgeDriver)\s*\(",
      "WebDriver instantiated directly in a test method -- use a managed fixture (@BeforeEach) instead"),
 
-    # Missing driver.quit() in teardown -- leaks processes. Heuristic: driver.quit()
-    # missing entirely in a file that constructs a driver is checked at file level
-    # by deterministic_review.py (Selenium-specific file-level rule), not per-line here.
+    # NOTE: "missing driver.quit() in teardown" is intentionally NOT a pattern
+    # here -- it requires whole-file reasoning (driver constructed somewhere,
+    # .quit() absent everywhere) that this line-based regex engine can't do
+    # reliably. See selenium-java/SKILL.md's "Not currently automated" note.
 ]
 
 LOW_PATTERNS = [
