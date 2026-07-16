@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """
-Layer 3 -- LLM auto-fix + push to the same PR/MR source branch.
+LLM auto-fix layer -- the ONLY place an LLM is involved in this engine.
 
-Given the findings and the current file contents, asks the LLM for corrected
-full-file contents (full-file replacement is more reliable to apply than a
-unified diff), writes them, commits as the bot identity, and pushes to the PR's
-source branch. The orchestrator (agent.py) enforces the loop guardrails.
+Findings always come from deterministic_review.py (skill scripts +
+qa-review-core, no LLM). This module takes those findings and the current
+file contents, asks the LLM for corrected full-file contents (full-file
+replacement is more reliable to apply than a unified diff), writes them,
+commits as the bot identity, and pushes to the same PR/MR source branch. The
+orchestrator (pr_mr_orchestrator.py) enforces the loop guardrails.
 
-Provider selection mirrors llm_review (claude | github). Standard library only,
-plus git via subprocess.
+Provider selection: claude (ANTHROPIC_API_KEY) or github (GH_MODELS_TOKEN /
+GITHUB_TOKEN) -- whichever the user has access to; see llm_client.choose_provider().
+Standard library only, plus git via subprocess.
 """
 
 import os
@@ -17,7 +20,7 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional
 
-from llm_review import _extract_json_array, _http_post, _language_for  # reuse
+from llm_client import _extract_json_array, _http_post, _language_for  # reuse
 
 
 FIX_SYSTEM_TEMPLATE = """You are fixing QA automation code review findings in a SINGLE pass.
@@ -155,8 +158,12 @@ def apply_fixes(fixes: List[dict], repo_root: str) -> List[str]:
 
 
 def commit_and_push(changed: List[str], repo_root: str, branch: str,
-                    iteration: int) -> bool:
-    """Commit the changed files as the bot and push to the PR source branch."""
+                    iteration: int, max_retries: int = 3) -> bool:
+    """Commit the changed files as the bot and push to the PR source branch.
+
+    Push can fail transiently (e.g. the branch moved, a network blip) --
+    retry up to max_retries times, re-fetching + rebasing between attempts,
+    before giving up. This is the PR-level push-retry guardrail (max 3)."""
     if not changed:
         return False
     bot_name = os.environ.get("BOT_NAME", "qa-review-bot")
@@ -169,14 +176,20 @@ def commit_and_push(changed: List[str], repo_root: str, branch: str,
                    "-c", f"user.email={bot_email}",
                    "commit", "-m", msg], repo_root)
     if commit.returncode != 0:
-        print(f"  [Layer 3] commit failed: {commit.stderr.strip()}")
+        print(f"  [fix] commit failed: {commit.stderr.strip()}")
         return False
-    push = _run(["git", "push", "origin", f"HEAD:{branch}"], repo_root)
-    if push.returncode != 0:
-        print(f"  [Layer 3] push failed: {push.stderr.strip()}")
-        return False
-    print(f"  [Layer 3] pushed auto-fix commit to {branch}: {', '.join(changed)}")
-    return True
+
+    for attempt in range(1, max_retries + 1):
+        push = _run(["git", "push", "origin", f"HEAD:{branch}"], repo_root)
+        if push.returncode == 0:
+            print(f"  [fix] pushed auto-fix commit to {branch}: {', '.join(changed)}")
+            return True
+        print(f"  [fix] push attempt {attempt}/{max_retries} failed: {push.stderr.strip()}")
+        if attempt < max_retries:
+            _run(["git", "fetch", "origin", branch], repo_root)
+            _run(["git", "rebase", f"origin/{branch}"], repo_root)
+    print(f"  [fix] push failed after {max_retries} attempts; giving up for this iteration.")
+    return False
 
 
 def last_commit_is_bot(repo_root: str) -> bool:

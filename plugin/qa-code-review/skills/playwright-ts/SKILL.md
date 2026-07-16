@@ -8,6 +8,12 @@ description: Playwright + TypeScript review overlay. Applied on top of qa-review
 Applied together with `qa-review-core`. Rules below are additional or refine a
 core rule for this stack.
 
+## Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/review.py` | Deterministic patterns for the rules below. Imports `playwright-js/scripts/review.py` (identical runtime API) and adds the TypeScript-only patterns (`any`/`as any`, typed helper params). Merged with `qa-review-core/scripts/review.py` by `deterministic_review.py` when this overlay is selected (detected via `@playwright/test` + `tsconfig.json`/`playwright.config.ts`). Review findings come only from this script — never from an LLM. |
+
 ## Critical
 
 - **Missing `await` on Playwright actions.** `page.goto/click/fill/check/

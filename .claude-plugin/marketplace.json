@@ -11,8 +11,8 @@
     {
       "name": "qa-code-review",
       "source": "./plugin/qa-code-review",
-      "description": "Review my unstaged changes with the qa-code-review standards, then auto-fix all Critical/High findings in place and re-review - don't push.",
-      "version": "1.0.0-rc1",
+      "description": "Deterministic script+SKILL.md QA automation review (no LLM in review) for GitHub and GitLab, with LLM-only auto-fix, gated retries, and push.",
+      "version": "2.0.0-rc1",
       "keywords": [
         "code-review",
         "qa",
@@ -23,6 +23,8 @@
         "bdd",
         "auto-fix",
         "pull-request",
+        "gitlab",
+        "github",
         "llm"
       ],
       "author": {
