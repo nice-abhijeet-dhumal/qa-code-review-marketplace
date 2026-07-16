@@ -71,8 +71,8 @@ Implementation-level checks not tied to a specific numbered rule above:
   every pattern against the changed files, and posts **one** comment. This is
   the entire review step — reproducible, and the sole source of findings and
   the score.
-- **Fix (LLM, only step where an LLM runs):** when auto-fix is enabled and the
-  score is below `SCORE_THRESHOLD`, `llm_auto_fix.py` asks the LLM (Claude or
+- **Fix (LLM, only step where an LLM runs):** when auto-fix is enabled and any
+  Critical/High findings remain, `llm_auto_fix.py` asks the LLM (Claude or
   GitHub Models, whichever the user has access to) to resolve the findings,
   applies a **verify-before-commit gate** (re-runs the deterministic review on
   the candidate and rejects any fix that does not reduce Critical/High),
@@ -91,7 +91,9 @@ Implementation-level checks not tied to a specific numbered rule above:
   (script error, environment misconfiguration), the agent retries the entire
   attempt up to 3 times total before reporting failure to the user. See
   `agents/qa-code-review.agent.md`.
-- Stop as soon as `score >= SCORE_THRESHOLD`.
-- **Bot-author guard:** never trigger an auto-fix in response to a commit whose
-  author is the bot itself — prevents an infinite review→fix→review loop.
+- Stop as soon as zero Critical/High findings remain. `SCORE_THRESHOLD`
+  (default 80) never gates this loop or the pipeline pass/fail result — the
+  pipeline fails on any Critical/High finding regardless of overall score;
+  the threshold only selects the verdict wording ("Approve" vs "Approve with
+  comments") once no Critical/High findings are left.
 - Change only what a finding requires; never reformat unrelated lines.

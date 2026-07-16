@@ -9,15 +9,20 @@ Flow (rule: review is script + SKILL.md only, LLM is fix-only):
   2. Review the CURRENT full content of the changed files using ONLY each
      active skill's scripts/review.py (deterministic_review.py, deterministic --
      no LLM call here at all). Post ONE comment with the findings.
-  3. If AUTO_FIX and score < SCORE_THRESHOLD and iteration < MAX_FIX_ITERATIONS
-     (PR-level retry cap, default 3): ask the LLM to fix (llm_auto_fix.py) ->
-     verify-before-commit gate (re-run deterministic_review.py on the
-     candidate, accept only if it does not regress Critical/High) -> commit
-     as bot -> push (retried up to 3x on transient failure) -> re-review.
-     This runs every time regardless of who authored the PR/MR head -- even
-     if the bot's own previous commit is HEAD -- so the pipeline always goes
-     review -> findings -> comment -> LLM fix -> re-review, up to the
-     MAX_FIX_ITERATIONS cap, on every trigger.
+  3. If AUTO_FIX and any Critical/High findings remain and iteration <
+     MAX_FIX_ITERATIONS (PR-level retry cap, default 3): ask the LLM to fix
+     (llm_auto_fix.py) -> verify-before-commit gate (re-run
+     deterministic_review.py on the candidate, accept only if it does not
+     regress Critical/High) -> commit as bot -> push (retried up to 3x on
+     transient failure) -> re-review. This runs every time regardless of who
+     authored the PR/MR head -- even if the bot's own previous commit is
+     HEAD -- so the pipeline always goes review -> findings -> comment ->
+     LLM fix -> re-review, up to the MAX_FIX_ITERATIONS cap, on every
+     trigger. SCORE_THRESHOLD only matters when there are zero Critical/High
+     findings left (it just picks the "Approve" vs "Approve with warnings"
+     wording) -- it can never mask an unresolved Critical/High, since the
+     pipeline gate (deterministic_review.save_and_print_report) fails on
+     Critical/High count alone, independent of score.
 
 Works on GitHub (PR) and GitLab (MR) via the same entrypoint -- the CI
 platform is auto-detected (GITHUB_ACTIONS / GITLAB_CI / CI_SOURCE) and the
@@ -31,7 +36,7 @@ Environment:
                              ANTHROPIC_API_KEY / GH_MODELS_TOKEN, see llm_client)
     AUTO_FIX                true | false (default false)
     MAX_FIX_ITERATIONS      PR-level retry cap, default 3
-    SCORE_THRESHOLD         stop fixing once score >= this, default 80
+    SCORE_THRESHOLD         verdict wording cutoff once no Critical/High remain, default 80
     BOT_NAME / BOT_EMAIL    fix-commit identity
     API_MAX_RETRIES         retries for transient API calls, default 3
 
@@ -242,8 +247,13 @@ def run():
 
         if not auto_fix:
             break
-        if score >= threshold:
-            print(f"Score >= threshold ({threshold}); no fix needed.")
+        crit_high = _critical_high(det)
+        if crit_high == 0 and score >= threshold:
+            print(f"No Critical/High findings and score >= threshold ({threshold}); no fix needed.")
+            break
+        if crit_high == 0:
+            print(f"Score {score} < threshold ({threshold}) but no Critical/High findings remain; "
+                  f"pipeline gate only blocks on Critical/High, so no fix needed.")
             break
         if iteration >= max_iter:
             print(f"Reached MAX_FIX_ITERATIONS ({max_iter}, PR-level retry cap); stopping.")
