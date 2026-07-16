@@ -7,14 +7,14 @@ Flow (rule: review is script + SKILL.md only, LLM is fix-only):
   1. Detect framework(s) via detect_framework.py -> composed skill list
      (qa-review-core always + one driver overlay + bdd-cucumber if applicable).
   2. Review the CURRENT full content of the changed files using ONLY each
-     active skill's scripts/review.py (engine.py, Layer 1, deterministic --
+     active skill's scripts/review.py (deterministic_review.py, deterministic --
      no LLM call here at all). Post ONE comment with the findings.
   3. If AUTO_FIX and score < SCORE_THRESHOLD and iteration < MAX_FIX_ITERATIONS
      (PR-level retry cap, default 3) and the PR/MR head was not authored by
-     the bot: ask the LLM to fix (llm_fix.py) -> verify-before-commit gate
-     (re-run engine.py on the candidate, accept only if it does not regress
-     Critical/High) -> commit as bot -> push (retried up to 3x on transient
-     failure) -> re-review.
+     the bot: ask the LLM to fix (llm_auto_fix.py) -> verify-before-commit gate
+     (re-run deterministic_review.py on the candidate, accept only if it does
+     not regress Critical/High) -> commit as bot -> push (retried up to 3x on
+     transient failure) -> re-review.
 
 Works on GitHub (PR) and GitLab (MR) via the same entrypoint -- the CI
 platform is auto-detected (GITHUB_ACTIONS / GITLAB_CI / CI_SOURCE) and the
@@ -25,7 +25,7 @@ Environment:
   Common:
     REPO_ROOT              checkout path (default '.')
     LLM_PROVIDER            claude | github | none (default: auto-detect from
-                             ANTHROPIC_API_KEY / GH_MODELS_TOKEN, see llm_common)
+                             ANTHROPIC_API_KEY / GH_MODELS_TOKEN, see llm_client)
     AUTO_FIX                true | false (default false)
     MAX_FIX_ITERATIONS      PR-level retry cap, default 3
     SCORE_THRESHOLD         stop fixing once score >= this, default 80
@@ -46,10 +46,10 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-import engine
+import deterministic_review
 import detect_framework as dispatcher
-import llm_fix
-from llm_common import choose_provider
+import llm_auto_fix
+from llm_client import choose_provider
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -59,10 +59,10 @@ def _env_bool(name: str, default: bool = False) -> bool:
 def apply_fixes_gated(fixes: list, repo_root: str, patterns: dict) -> list:
     """Write a candidate fix only if it does NOT regress the file.
 
-    Verify-before-commit: recompute deterministic findings (engine.py) on the
-    candidate content. Accept only if Critical/High strictly drops, or holds
-    while total drops. Guarantees the deterministic count is monotonically
-    non-increasing across iterations.
+    Verify-before-commit: recompute deterministic findings
+    (deterministic_review.py) on the candidate content. Accept only if
+    Critical/High strictly drops, or holds while total drops. Guarantees the
+    deterministic count is monotonically non-increasing across iterations.
     """
     accepted = []
     for fix in fixes:
@@ -75,8 +75,8 @@ def apply_fixes_gated(fixes: list, repo_root: str, patterns: dict) -> list:
         old = target.read_text(encoding="utf-8", errors="ignore")
         if old == content:
             continue
-        old_f = engine.analyze_file_content(old, rel, patterns)
-        new_f = engine.analyze_file_content(content, rel, patterns)
+        old_f = deterministic_review.analyze_file_content(old, rel, patterns)
+        new_f = deterministic_review.analyze_file_content(content, rel, patterns)
         old_ch, new_ch = _critical_high(old_f), _critical_high(new_f)
         improves = new_ch < old_ch or (new_ch == old_ch and len(new_f) < len(old_f))
         if not improves:
@@ -114,18 +114,22 @@ class GitHubAdapter:
         self.retries = retries
 
     def changed_files(self) -> list:
-        files = engine.with_retries(engine.github_api, "GET", f"/repos/{self.repo}/pulls/{self.number}/files",
-                                     max_retries=self.retries, label="GitHub PR files fetch")
-        return [f["filename"] for f in files if f.get("filename") and not engine.should_skip_file(f["filename"])]
+        files = deterministic_review.with_retries(
+            deterministic_review.github_api, "GET", f"/repos/{self.repo}/pulls/{self.number}/files",
+            max_retries=self.retries, label="GitHub PR files fetch")
+        return [f["filename"] for f in files
+                if f.get("filename") and not deterministic_review.should_skip_file(f["filename"])]
 
     def head_branch(self) -> str:
-        pr = engine.with_retries(engine.github_api, "GET", f"/repos/{self.repo}/pulls/{self.number}",
-                                  max_retries=self.retries, label="GitHub PR fetch")
+        pr = deterministic_review.with_retries(
+            deterministic_review.github_api, "GET", f"/repos/{self.repo}/pulls/{self.number}",
+            max_retries=self.retries, label="GitHub PR fetch")
         return pr["head"]["ref"]
 
     def post_comment(self, body: str) -> None:
-        engine.with_retries(engine.github_api, "POST", f"/repos/{self.repo}/issues/{self.number}/comments",
-                             {"body": body}, max_retries=self.retries, label="GitHub PR comment post")
+        deterministic_review.with_retries(
+            deterministic_review.github_api, "POST", f"/repos/{self.repo}/issues/{self.number}/comments",
+            {"body": body}, max_retries=self.retries, label="GitHub PR comment post")
 
 
 class GitLabAdapter:
@@ -137,25 +141,28 @@ class GitLabAdapter:
         self.retries = retries
 
     def changed_files(self) -> list:
-        changes = engine.with_retries(engine.gitlab_api, "GET",
-                                       f"/projects/{self.project_id}/merge_requests/{self.iid}/changes",
-                                       max_retries=self.retries, label="GitLab MR changes fetch")
+        changes = deterministic_review.with_retries(
+            deterministic_review.gitlab_api, "GET",
+            f"/projects/{self.project_id}/merge_requests/{self.iid}/changes",
+            max_retries=self.retries, label="GitLab MR changes fetch")
         paths = [c.get("new_path", c.get("old_path")) for c in changes.get("changes", [])]
-        return [p for p in paths if p and not engine.should_skip_file(p)]
+        return [p for p in paths if p and not deterministic_review.should_skip_file(p)]
 
     def head_branch(self) -> str:
-        mr = engine.with_retries(engine.gitlab_api, "GET", f"/projects/{self.project_id}/merge_requests/{self.iid}",
-                                  max_retries=self.retries, label="GitLab MR fetch")
+        mr = deterministic_review.with_retries(
+            deterministic_review.gitlab_api, "GET", f"/projects/{self.project_id}/merge_requests/{self.iid}",
+            max_retries=self.retries, label="GitLab MR fetch")
         return mr["source_branch"]
 
     def post_comment(self, body: str) -> None:
-        engine.with_retries(engine.gitlab_api, "POST",
-                             f"/projects/{self.project_id}/merge_requests/{self.iid}/notes",
-                             {"body": body}, max_retries=self.retries, label="GitLab MR comment post")
+        deterministic_review.with_retries(
+            deterministic_review.gitlab_api, "POST",
+            f"/projects/{self.project_id}/merge_requests/{self.iid}/notes",
+            {"body": body}, max_retries=self.retries, label="GitLab MR comment post")
 
 
 def _build_adapter(retries: int):
-    source = engine.detect_ci_source()
+    source = deterministic_review.detect_ci_source()
     if source == "gitlab" or os.environ.get("CI_MERGE_REQUEST_IID"):
         return GitLabAdapter(retries)
     if source == "github" or os.environ.get("PR_NUMBER"):
@@ -166,14 +173,15 @@ def _build_adapter(retries: int):
 
 
 # ----------------------------------------------------------------------------
-# Review (Layer 1 only -- no LLM)
+# Review (deterministic only -- no LLM)
 # ----------------------------------------------------------------------------
 
 def review_once(repo_root: str, changed: list, patterns: dict) -> list:
     """Review the CURRENT full content of the changed files. Deterministic
-    only -- every finding comes from a skill's scripts/review.py via engine.py.
-    Reviewing full file content (not the incremental diff) keeps the scope
-    stable, so a real fix strictly reduces findings instead of inflating a diff.
+    only -- every finding comes from a skill's scripts/review.py via
+    deterministic_review.py. Reviewing full file content (not the incremental
+    diff) keeps the scope stable, so a real fix strictly reduces findings
+    instead of inflating a diff.
     """
     det = []
     for path in changed:
@@ -181,7 +189,7 @@ def review_once(repo_root: str, changed: list, patterns: dict) -> list:
         if content is None:
             continue
         print(f"  Reviewing (full content): {path}")
-        det.extend(engine.analyze_file_content(content, path, patterns))
+        det.extend(deterministic_review.analyze_file_content(content, path, patterns))
     return det
 
 
@@ -196,7 +204,7 @@ def run():
     adapter = _build_adapter(api_retries)
     resolved = dispatcher.resolve(repo_root)
     standard = resolved["standard"]  # fix-context only, never used to find issues
-    patterns = engine.load_patterns(resolved["skills"], os.environ.get("SKILLS_DIR"))
+    patterns = deterministic_review.load_patterns(resolved["skills"], os.environ.get("SKILLS_DIR"))
 
     print(f"Platform: {adapter.label}")
     print(f"Frameworks detected -> skills: {', '.join(resolved['skills'])}")
@@ -212,7 +220,7 @@ def run():
     print("-" * 60)
 
     # Bot-author guard: never start a fix loop off the bot's own push.
-    if auto_fix and llm_fix.last_commit_is_bot(repo_root):
+    if auto_fix and llm_auto_fix.last_commit_is_bot(repo_root):
         print(f"{adapter.label} head was authored by the bot -- skipping auto-fix to avoid a loop.")
         auto_fix = False
 
@@ -225,10 +233,11 @@ def run():
         label = "Initial review" if iteration == 0 else f"Re-review (iteration {iteration})"
         print(f"\n=== {label} ===")
         det = review_once(repo_root, changed, patterns)
-        score, verdict = engine.compute_score(det)
+        score, verdict = deterministic_review.compute_score(det)
         mode_label = f"{adapter.label} -- {label} -- skills: {', '.join(resolved['skills'])}"
-        report = engine.format_report(det, score, verdict,
-                                       {"mode_label": mode_label, "skills_label": ", ".join(resolved["skills"])})
+        report = deterministic_review.format_report(
+            det, score, verdict,
+            {"mode_label": mode_label, "skills_label": ", ".join(resolved["skills"])})
         adapter.post_comment(report)
         print(f"Score: {score}/100 -- {verdict} | deterministic findings: {len(det)} "
               f"(Critical/High {_critical_high(det)})")
@@ -244,16 +253,16 @@ def run():
 
         iteration += 1
         print(f"\n=== LLM fix (iteration {iteration}/{max_iter}) ===")
-        fixes = llm_fix.build_fixes(det, repo_root, standard, provider)
+        fixes = llm_auto_fix.build_fixes(det, repo_root, standard, provider)
         accepted = apply_fixes_gated(fixes, repo_root, patterns)
         if not accepted:
             print("No fix improved the deterministic findings; stopping.")
             break
-        if not llm_fix.commit_and_push(accepted, repo_root, branch, iteration, max_retries=api_retries):
+        if not llm_auto_fix.commit_and_push(accepted, repo_root, branch, iteration, max_retries=api_retries):
             print("Push failed after retries; stopping fix loop.")
             break
 
-    engine.save_and_print_report(report, det, score, verdict)
+    deterministic_review.save_and_print_report(report, det, score, verdict)
 
 
 if __name__ == "__main__":

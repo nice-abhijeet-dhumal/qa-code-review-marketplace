@@ -9,9 +9,10 @@ ordered, composable set of skills that apply. Skills layer:
     + one driver overlay      (playwright-ts | playwright-js | selenium-java)
     + bdd-cucumber            (additive, when .feature files are present)
 
-Each selected skill owns its own `scripts/review.py` (see `engine.py`, which
-loads and merges them). This module ONLY resolves which skills apply and
-loads their `SKILL.md` bodies (used as LLM fix-context, never for review).
+Each selected skill owns its own `scripts/review.py` (see
+`deterministic_review.py`, which loads and merges them). This module ONLY
+resolves which skills apply and loads their `SKILL.md` bodies (used as LLM
+fix-context, never for review).
 
 Detection scans the repo root AND its immediate subdirectories (depth 1), not
 just the root. Multi-package layouts -- a root `package.json` with no test
@@ -121,8 +122,9 @@ def load_skills(repo_root: str, skill_names: List[str],
                 skills_dir: Optional[str] = None) -> str:
     """Concatenate the SKILL.md bodies for the given skill names.
 
-    Used ONLY as fix-context for the LLM fix layer -- review findings never
-    come from this text, only from each skill's scripts/review.py (engine.py).
+    Used ONLY as fix-context for the LLM auto-fix layer -- review findings
+    never come from this text, only from each skill's scripts/review.py
+    (deterministic_review.py).
     """
     base = Path(skills_dir) if skills_dir else plugin_skills_dir()
     parts: List[str] = []

@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """
-LLM fix layer -- the ONLY place an LLM is involved in this engine.
+LLM auto-fix layer -- the ONLY place an LLM is involved in this engine.
 
-Findings always come from engine.py (deterministic, Layer 1: skill scripts +
-qa-review-core). This module takes those findings and the current file
-contents, asks the LLM for corrected full-file contents (full-file
+Findings always come from deterministic_review.py (skill scripts +
+qa-review-core, no LLM). This module takes those findings and the current
+file contents, asks the LLM for corrected full-file contents (full-file
 replacement is more reliable to apply than a unified diff), writes them,
 commits as the bot identity, and pushes to the same PR/MR source branch. The
-orchestrator (pr_review.py) enforces the loop guardrails.
+orchestrator (pr_mr_orchestrator.py) enforces the loop guardrails.
 
 Provider selection: claude (ANTHROPIC_API_KEY) or github (GH_MODELS_TOKEN /
-GITHUB_TOKEN) -- whichever the user has access to; see llm_common.choose_provider().
+GITHUB_TOKEN) -- whichever the user has access to; see llm_client.choose_provider().
 Standard library only, plus git via subprocess.
 """
 
@@ -20,7 +20,7 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional
 
-from llm_common import _extract_json_array, _http_post, _language_for  # reuse
+from llm_client import _extract_json_array, _http_post, _language_for  # reuse
 
 
 FIX_SYSTEM_TEMPLATE = """You are fixing QA automation code review findings in a SINGLE pass.
@@ -124,8 +124,9 @@ def build_fixes(findings: List[dict], repo_root: str, standard: str,
             "language": _language_for(rel),
             "must_fix_critical_high": must,
             "findings": [
-                {"severity": f["severity"], "line": f["line"],
-                 "rule": f["rule"], "detail": f.get("code", "")}
+                {"id": f.get("id"), "severity": f["severity"], "line": f["line"],
+                 "rule": f["rule"], "detail": f.get("code", ""),
+                 "suggestion": f.get("suggestion", "")}
                 for f in file_findings
             ],
             "content": p.read_text(encoding="utf-8", errors="ignore"),
