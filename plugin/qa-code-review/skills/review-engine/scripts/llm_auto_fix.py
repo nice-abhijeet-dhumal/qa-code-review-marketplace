@@ -190,10 +190,3 @@ def commit_and_push(changed: List[str], repo_root: str, branch: str,
             _run(["git", "rebase", f"origin/{branch}"], repo_root)
     print(f"  [fix] push failed after {max_retries} attempts; giving up for this iteration.")
     return False
-
-
-def last_commit_is_bot(repo_root: str) -> bool:
-    """Bot-author guard: True if HEAD was authored by the fix bot."""
-    bot_email = os.environ.get("BOT_EMAIL", "qa-review-bot@users.noreply.github.com")
-    res = _run(["git", "log", "-1", "--format=%ae"], repo_root)
-    return res.returncode == 0 and res.stdout.strip() == bot_email

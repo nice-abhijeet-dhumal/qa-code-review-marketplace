@@ -10,11 +10,14 @@ Flow (rule: review is script + SKILL.md only, LLM is fix-only):
      active skill's scripts/review.py (deterministic_review.py, deterministic --
      no LLM call here at all). Post ONE comment with the findings.
   3. If AUTO_FIX and score < SCORE_THRESHOLD and iteration < MAX_FIX_ITERATIONS
-     (PR-level retry cap, default 3) and the PR/MR head was not authored by
-     the bot: ask the LLM to fix (llm_auto_fix.py) -> verify-before-commit gate
-     (re-run deterministic_review.py on the candidate, accept only if it does
-     not regress Critical/High) -> commit as bot -> push (retried up to 3x on
-     transient failure) -> re-review.
+     (PR-level retry cap, default 3): ask the LLM to fix (llm_auto_fix.py) ->
+     verify-before-commit gate (re-run deterministic_review.py on the
+     candidate, accept only if it does not regress Critical/High) -> commit
+     as bot -> push (retried up to 3x on transient failure) -> re-review.
+     This runs every time regardless of who authored the PR/MR head -- even
+     if the bot's own previous commit is HEAD -- so the pipeline always goes
+     review -> findings -> comment -> LLM fix -> re-review, up to the
+     MAX_FIX_ITERATIONS cap, on every trigger.
 
 Works on GitHub (PR) and GitLab (MR) via the same entrypoint -- the CI
 platform is auto-detected (GITHUB_ACTIONS / GITLAB_CI / CI_SOURCE) and the
@@ -29,7 +32,7 @@ Environment:
     AUTO_FIX                true | false (default false)
     MAX_FIX_ITERATIONS      PR-level retry cap, default 3
     SCORE_THRESHOLD         stop fixing once score >= this, default 80
-    BOT_NAME / BOT_EMAIL    fix-commit identity + bot-author guard
+    BOT_NAME / BOT_EMAIL    fix-commit identity
     API_MAX_RETRIES         retries for transient API calls, default 3
 
   GitHub:
@@ -218,11 +221,6 @@ def run():
         if auto_fix:
             print("      auto-fix requested but no provider -> nothing to fix with.")
     print("-" * 60)
-
-    # Bot-author guard: never start a fix loop off the bot's own push.
-    if auto_fix and llm_auto_fix.last_commit_is_bot(repo_root):
-        print(f"{adapter.label} head was authored by the bot -- skipping auto-fix to avoid a loop.")
-        auto_fix = False
 
     branch = adapter.head_branch() if auto_fix else None
     changed = adapter.changed_files()

@@ -133,7 +133,7 @@ subdirectories, so `ui/`, `api/`-style monorepos are detected correctly).
 | `MAX_FIX_ITERATIONS` | No | PR-level retry cap (default `3`) |
 | `API_MAX_RETRIES` | No | API/push retry cap (default `3`) |
 | `SCORE_THRESHOLD` | No | Stop when deterministic score ≥ this (default `80`) |
-| `BOT_NAME` / `BOT_EMAIL` | No | Identity for auto-fix commits + the bot-author guard |
+| `BOT_NAME` / `BOT_EMAIL` | No | Identity for auto-fix commits |
 
 ## Skills
 
