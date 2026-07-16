@@ -33,7 +33,7 @@ MEDIUM_PATTERNS = [
 
     # Missing driver.quit() in teardown -- leaks processes. Heuristic: driver.quit()
     # missing entirely in a file that constructs a driver is checked at file level
-    # by engine.py (Selenium-specific file-level rule), not per-line here.
+    # by deterministic_review.py (Selenium-specific file-level rule), not per-line here.
 ]
 
 LOW_PATTERNS = [

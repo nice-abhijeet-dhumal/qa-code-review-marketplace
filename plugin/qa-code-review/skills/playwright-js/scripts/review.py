@@ -16,7 +16,7 @@ CRITICAL_PATTERNS = [
 
     # Nested test() inside another test() body -- causes a Playwright runtime error.
     # Context-aware (must distinguish from valid test() inside test.describe());
-    # handled in engine.py's analyze_file_content, not via a simple regex here.
+    # handled in deterministic_review.py's analyze_file_content, not via a simple regex here.
 ]
 
 HIGH_PATTERNS = [
@@ -84,8 +84,8 @@ LOW_PATTERNS = [
 ]
 
 # Playwright test import inside a page object file -- only meaningful when
-# engine.py knows the file is a page object; kept here as a HIGH pattern with
-# a rule-name marker engine.py's context-aware _check_line recognizes.
+# deterministic_review.py knows the file is a page object; kept here as a HIGH pattern with
+# a rule-name marker deterministic_review.py's context-aware _check_line recognizes.
 HIGH_PATTERNS.append(
     (r"import\s+\{[^}]*\}\s+from\s+['\"]@playwright/test['\"]",
      "Playwright test framework imported without Page type -- verify this is needed")

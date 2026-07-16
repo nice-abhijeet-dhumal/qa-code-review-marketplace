@@ -12,7 +12,7 @@ core rule for this stack.
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/review.py` | Deterministic patterns for the rules below. Imports `playwright-js/scripts/review.py` (identical runtime API) and adds the TypeScript-only patterns (`any`/`as any`, typed helper params). Merged with `qa-review-core/scripts/review.py` by `engine.py` when this overlay is selected (detected via `@playwright/test` + `tsconfig.json`/`playwright.config.ts`). Review findings come only from this script — never from an LLM. |
+| `scripts/review.py` | Deterministic patterns for the rules below. Imports `playwright-js/scripts/review.py` (identical runtime API) and adds the TypeScript-only patterns (`any`/`as any`, typed helper params). Merged with `qa-review-core/scripts/review.py` by `deterministic_review.py` when this overlay is selected (detected via `@playwright/test` + `tsconfig.json`/`playwright.config.ts`). Review findings come only from this script — never from an LLM. |
 
 ## Critical
 

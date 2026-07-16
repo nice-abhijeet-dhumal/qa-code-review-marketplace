@@ -3,13 +3,13 @@
 qa-review-core -- deterministic patterns (Layer 1).
 
 Framework-agnostic rules from SKILL.md's "Universal rules" section. Always
-loaded by engine.py regardless of which driver overlay (playwright-ts,
+loaded by deterministic_review.py regardless of which driver overlay (playwright-ts,
 playwright-js, selenium-java) is also active. No LLM involved -- these are
 plain regexes, reproducible and authoritative.
 
 Each pattern is (regex, rule_name). Severity is implied by which list it is
-in; engine.py handles the few rules that need line context (is_page_object,
-is_spec_file) by matching on a substring of rule_name -- see engine.py's
+in; deterministic_review.py handles the few rules that need line context (is_page_object,
+is_spec_file) by matching on a substring of rule_name -- see deterministic_review.py's
 _check_line docstring for the exact contract a rule name must follow to opt
 into that context-aware behaviour.
 """
@@ -23,7 +23,7 @@ CRITICAL_PATTERNS = [
     (r"(it|test)\s*\([^)]*,\s*(\(\s*\)|async\s*\(\s*\))\s*=>\s*\{\s*\}\s*\)", "Empty test body"),
     (r"@Test[^\n]*\n\s*(public|private)?\s*void\s+\w+\s*\([^)]*\)\s*\{\s*\}", "Empty @Test body"),
 
-    # Universal rule 2: no hardcoded/blind sleeps. >1s is Critical; engine.py
+    # Universal rule 2: no hardcoded/blind sleeps. >1s is Critical; deterministic_review.py
     # downgrades this to Medium inside page objects (short stabilization waits).
     (r"waitForTimeout\s*\(\s*\d{4,}", "Hardcoded waitForTimeout > 1s -- use waitFor/expect assertions"),
     (r"waitForTimeout\s*\(\s*[1-9]\d{3,}", "Hardcoded waitForTimeout > 1s -- use waitFor/expect assertions"),

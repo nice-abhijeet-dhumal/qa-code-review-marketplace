@@ -13,7 +13,7 @@ easier to ship and matter more.
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/review.py` | Deterministic patterns for the rules below (`CRITICAL_PATTERNS`, `HIGH_PATTERNS`, `MEDIUM_PATTERNS`, `LOW_PATTERNS`). Merged with `qa-review-core/scripts/review.py` by `engine.py` when this overlay is selected (detected via `@playwright/test` in `package.json` with no `tsconfig.json`/`playwright.config.ts`). Review findings come only from this script — never from an LLM; `playwright-ts/scripts/review.py` re-exports these patterns and adds the TS-only ones. |
+| `scripts/review.py` | Deterministic patterns for the rules below (`CRITICAL_PATTERNS`, `HIGH_PATTERNS`, `MEDIUM_PATTERNS`, `LOW_PATTERNS`). Merged with `qa-review-core/scripts/review.py` by `deterministic_review.py` when this overlay is selected (detected via `@playwright/test` in `package.json` with no `tsconfig.json`/`playwright.config.ts`). Review findings come only from this script — never from an LLM; `playwright-ts/scripts/review.py` re-exports these patterns and adds the TS-only ones. |
 
 ## Critical
 

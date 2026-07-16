@@ -19,13 +19,13 @@ uses only the Python standard library (`urllib`, `json`, `subprocess`). Python
 3.9+ is sufficient.
 
 **Review has NO LLM involvement, ever.** Every finding comes from
-`engine.py`, which loads and runs `qa-review-core/scripts/review.py` plus the
+`deterministic_review.py`, which loads and runs `qa-review-core/scripts/review.py` plus the
 detected driver overlay's `scripts/review.py` (+ `bdd-cucumber`'s if `.feature`
 files exist). This is deterministic, reproducible, and authoritative — do not
 "also" review with your own judgment and merge that in; the reported findings
 ARE the review.
 
-**The LLM is used for exactly one thing: fixing findings** (`llm_fix.py`),
+**The LLM is used for exactly one thing: fixing findings** (`llm_auto_fix.py`),
 gated by a **verify-before-commit check** that rejects any candidate fix which
 would not reduce the deterministic Critical/High count. The count can only go
 down across iterations.
@@ -36,11 +36,11 @@ down across iterations.
 
 | User Request | Script to Run |
 |---|---|
-| "Review PR #N" (GitHub) / "Review MR !N" (GitLab), with or without "and fix" | `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_review.py"` — env for GitHub: `GITHUB_REPOSITORY`, `PR_NUMBER`, `GITHUB_TOKEN`, `REPO_ROOT`; env for GitLab: `CI_PROJECT_ID`, `CI_MERGE_REQUEST_IID`, `GITLAB_API_URL`, `GITLAB_PERSONAL_ACCESS_TOKEN`, `REPO_ROOT`. Platform is auto-detected. Runs: detect framework → deterministic review (no LLM) → post one comment → gated LLM fix → push → re-review. |
+| "Review PR #N" (GitHub) / "Review MR !N" (GitLab), with or without "and fix" | `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/pr_mr_orchestrator.py"` — env for GitHub: `GITHUB_REPOSITORY`, `PR_NUMBER`, `GITHUB_TOKEN`, `REPO_ROOT`; env for GitLab: `CI_PROJECT_ID`, `CI_MERGE_REQUEST_IID`, `GITLAB_API_URL`, `GITLAB_PERSONAL_ACCESS_TOKEN`, `REPO_ROOT`. Platform is auto-detected. Runs: detect framework → deterministic review (no LLM) → post one comment → gated LLM fix → push → re-review. |
 | "Which framework/standards apply to this repo?" | `python3 "${CLAUDE_PLUGIN_ROOT}/scripts/detect_framework.py"` with env `REPO_ROOT`. Prints the composed skill list (JSON). |
-| "Review my local/staged changes" | `REVIEW_MODE=local REPO_ROOT=<path> python3 "${CLAUDE_PLUGIN_ROOT}/scripts/engine.py"` — reads current file content directly, so it works even when a file is fully `git add`-staged (a plain `git diff` would show nothing for it). |
-| "Scan the whole repo" | `REVIEW_MODE=repo REPO_ROOT=<path> python3 "${CLAUDE_PLUGIN_ROOT}/scripts/engine.py"` |
-| "Review a specific commit" | `REVIEW_MODE=commit COMMIT_SHA=<sha> REPO_ROOT=<path> python3 "${CLAUDE_PLUGIN_ROOT}/scripts/engine.py"` (GitHub or GitLab, auto-detected) |
+| "Review my local/staged changes" | `REVIEW_MODE=local REPO_ROOT=<path> python3 "${CLAUDE_PLUGIN_ROOT}/scripts/deterministic_review.py"` — reads current file content directly, so it works even when a file is fully `git add`-staged (a plain `git diff` would show nothing for it). |
+| "Scan the whole repo" | `REVIEW_MODE=repo REPO_ROOT=<path> python3 "${CLAUDE_PLUGIN_ROOT}/scripts/deterministic_review.py"` |
+| "Review a specific commit" | `REVIEW_MODE=commit COMMIT_SHA=<sha> REPO_ROOT=<path> python3 "${CLAUDE_PLUGIN_ROOT}/scripts/deterministic_review.py"` (GitHub or GitLab, auto-detected) |
 
 If the user has neither `ANTHROPIC_API_KEY` nor a GitHub Models token
 (`GH_MODELS_TOKEN`/`GITHUB_TOKEN`), the agent still runs the full deterministic
@@ -52,18 +52,18 @@ silently — review quality is completely unaffected either way.
 ## Agent flow (local, this Claude Code session)
 
 1. **Detect** the framework: `detect_framework.py`.
-2. **Find flaws**: run `engine.py` (`REVIEW_MODE=local` for staged/unstaged
+2. **Find flaws**: run `deterministic_review.py` (`REVIEW_MODE=local` for staged/unstaged
    changes, or `repo` for a full scan) — this calls the driver skill's
    `scripts/review.py` AND always `qa-review-core/scripts/review.py`, merges
    the findings. No LLM here.
 3. **Fix**: for Critical/High findings, invoke the LLM fix layer
-   (`llm_fix.py`'s `build_fixes` + the verify-before-commit gate) to update
+   (`llm_auto_fix.py`'s `build_fixes` + the verify-before-commit gate) to update
    the code in place.
 4. **Push** the result to the working branch.
 
 **Agent-level retry (max 3):** if step 2, 3, or 4 fails for a reason outside
 the built-in guardrails (a script error, a missing env var, a transient push
-rejection not already retried by `llm_fix.commit_and_push`), retry the entire
+rejection not already retried by `llm_auto_fix.commit_and_push`), retry the entire
 1→4 sequence up to 3 times total before reporting the failure to the user
 with the actual error — never silently give up after one attempt, and never
 retry more than 3 times.
@@ -71,22 +71,22 @@ retry more than 3 times.
 ## PR/MR flow (CI — GitHub or GitLab)
 
 1. **Detect** the framework: `detect_framework.py`.
-2. **Find flaws**: `engine.py` against the changed files' current full
+2. **Find flaws**: `deterministic_review.py` against the changed files' current full
    content — driver skill's `scripts/review.py` + always
    `qa-review-core/scripts/review.py`. No LLM here.
-3. **Post findings** as one PR/MR comment (`pr_review.py`).
+3. **Post findings** as one PR/MR comment (`pr_mr_orchestrator.py`).
 4. **Fix**: LLM fix layer resolves Critical/High findings, verify-before-commit
    gate, commit as bot.
 5. **Push** to the same PR/MR source branch, then **re-review** (back to step 2).
 
 **PR-level retry (max 3, `MAX_FIX_ITERATIONS`):** steps 2-5 repeat until the
 score clears `SCORE_THRESHOLD` or 3 iterations are spent, whichever comes
-first — this is `pr_review.py`'s built-in loop, already enforced by the
+first — this is `pr_mr_orchestrator.py`'s built-in loop, already enforced by the
 script; do not add a second loop around it.
 
 **API/push retry (max 3, `API_MAX_RETRIES`):** each GitHub/GitLab API call and
 the fix-commit push retries transient failures up to 3 times internally
-(`engine.with_retries`, `llm_fix.commit_and_push`) before the current
+(`deterministic_review.with_retries`, `llm_auto_fix.commit_and_push`) before the current
 iteration gives up.
 
 ---
@@ -109,7 +109,7 @@ subdirectories, so `ui/`, `api/`-style monorepos are detected correctly).
 - **Script-only review, LLM-only fix**: findings are 100% deterministic and
   reproducible; the LLM never decides what is wrong, only how to fix it.
   Monotonic — findings never increase between iterations.
-- **GitHub and GitLab**, same entrypoint (`pr_review.py`), auto-detected.
+- **GitHub and GitLab**, same entrypoint (`pr_mr_orchestrator.py`), auto-detected.
 - **Dual fix engine**: `LLM_PROVIDER=claude` (Anthropic API) or `github`
   (GitHub Models / Copilot-family) — auto-chosen from whichever credential the
   user has, or set explicitly.

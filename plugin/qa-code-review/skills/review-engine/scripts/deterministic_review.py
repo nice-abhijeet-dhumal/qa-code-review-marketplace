@@ -5,7 +5,7 @@ QA Automation Code Review -- deterministic engine (Layer 1 only, NO LLM).
 Review is 100% script + SKILL.md driven: this module loads each active
 skill's `scripts/review.py` (as resolved by `detect_framework.py`) and runs
 its patterns against the file(s) under review. There is no LLM involved in
-finding issues -- only in `llm_fix.py`, which fixes what this engine reports.
+finding issues -- only in `llm_auto_fix.py`, which fixes what this engine reports.
 
 Supports three review modes, selected via the REVIEW_MODE environment
 variable:
@@ -561,6 +561,6 @@ if __name__ == "__main__":
             sys.exit(1)
         run_commit_review()
     else:
-        print(f"ERROR: Unsupported REVIEW_MODE '{review_mode}' for engine.py standalone use. "
-              "Use pr_review.py for the full PR/MR review + auto-fix loop.")
+        print(f"ERROR: Unsupported REVIEW_MODE '{review_mode}' for deterministic_review.py standalone use. "
+              "Use pr_mr_orchestrator.py for the full PR/MR review + auto-fix loop.")
         sys.exit(1)

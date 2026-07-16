@@ -17,7 +17,7 @@ are specific to Gherkin and the feature/step boundary.
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/review.py` | Deterministic patterns, split by file kind: `FEATURE_*_PATTERNS` run against `.feature` files, `STEP_*_PATTERNS` run against step-definition source files (path/name heuristics). Loaded additively by `engine.py` alongside `qa-review-core` and the active driver overlay whenever any `.feature` file exists in the repo. Review findings come only from this script — never from an LLM. |
+| `scripts/review.py` | Deterministic patterns, split by file kind: `FEATURE_*_PATTERNS` run against `.feature` files, `STEP_*_PATTERNS` run against step-definition source files (path/name heuristics). Loaded additively by `deterministic_review.py` alongside `qa-review-core` and the active driver overlay whenever any `.feature` file exists in the repo. Review findings come only from this script — never from an LLM. |
 
 ## High
 

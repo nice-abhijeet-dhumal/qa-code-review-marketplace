@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """
-Shared HTTP/parsing helpers for the LLM FIX layer (llm_fix.py).
+Shared HTTP/parsing helpers for the LLM auto-fix layer (llm_auto_fix.py).
 
-There is no LLM review layer -- findings come only from engine.py (Layer 1,
-deterministic). The LLM is used exclusively to generate fixes for those
-findings, per provider (Claude or GitHub Models / Copilot-family), based on
-whichever the user has access to.
+There is no LLM review layer -- findings come only from deterministic_review.py
+(the deterministic engine). The LLM is used exclusively to generate fixes for
+those findings, per provider (Claude or GitHub Models / Copilot-family), based
+on whichever the user has access to.
 """
 
 import json

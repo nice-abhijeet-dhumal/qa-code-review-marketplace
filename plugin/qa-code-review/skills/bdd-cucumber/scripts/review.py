@@ -7,8 +7,8 @@ active, whenever the repo contains .feature files. Covers the Gherkin/glue
 boundary specifically; driver-level rules (Playwright/Selenium) still apply
 inside step definitions. No LLM involved.
 
-Two pattern sets, keyed by whether engine.py is looking at a .feature file
-or a step-definition source file (.java/.ts/.js) -- engine.py picks the
+Two pattern sets, keyed by whether deterministic_review.py is looking at a .feature file
+or a step-definition source file (.java/.ts/.js) -- deterministic_review.py picks the
 right list based on the file extension it is currently analyzing.
 """
 
@@ -50,7 +50,7 @@ STEP_MEDIUM_PATTERNS = [
 
 STEP_LOW_PATTERNS = []
 
-# Backward-compatible names engine.py falls back to for any file extension it
+# Backward-compatible names deterministic_review.py falls back to for any file extension it
 # does not recognize as .feature (kept empty -- driver overlays already cover
 # the source files under review; the feature-specific sets above are what
 # make this overlay meaningful).

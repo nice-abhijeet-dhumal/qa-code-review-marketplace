@@ -16,7 +16,7 @@ the active driver overlay's script) already reported.
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/review.py` | Deterministic patterns for the universal rules below (`CRITICAL_PATTERNS`, `HIGH_PATTERNS`, `MEDIUM_PATTERNS`, `LOW_PATTERNS`). Loaded and merged with the active driver overlay's own `scripts/review.py` by `review-engine`'s `engine.py`. Always loaded, regardless of detected framework. |
+| `scripts/review.py` | Deterministic patterns for the universal rules below (`CRITICAL_PATTERNS`, `HIGH_PATTERNS`, `MEDIUM_PATTERNS`, `LOW_PATTERNS`). Loaded and merged with the active driver overlay's own `scripts/review.py` by `review-engine`'s `deterministic_review.py`. Always loaded, regardless of detected framework. |
 
 ## Severity model
 
@@ -54,14 +54,14 @@ Score starts at 100. Verdict: `>=90` Approve, `75-89` Approve with comments,
 
 ## Review / fix contract
 
-- **Review (deterministic, no LLM):** `engine.py` detects the framework, loads
+- **Review (deterministic, no LLM):** `deterministic_review.py` detects the framework, loads
   `qa-review-core/scripts/review.py` + the active driver overlay's
   `scripts/review.py` (+ `bdd-cucumber`'s if `.feature` files exist), runs
   every pattern against the changed files, and posts **one** comment. This is
   the entire review step — reproducible, and the sole source of findings and
   the score.
 - **Fix (LLM, only step where an LLM runs):** when auto-fix is enabled and the
-  score is below `SCORE_THRESHOLD`, `llm_fix.py` asks the LLM (Claude or
+  score is below `SCORE_THRESHOLD`, `llm_auto_fix.py` asks the LLM (Claude or
   GitHub Models, whichever the user has access to) to resolve the findings,
   applies a **verify-before-commit gate** (re-runs the deterministic review on
   the candidate and rejects any fix that does not reduce Critical/High),
