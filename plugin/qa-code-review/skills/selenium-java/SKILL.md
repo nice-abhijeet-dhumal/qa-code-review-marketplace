@@ -7,6 +7,12 @@ description: Selenium + Java review overlay. Applied on top of qa-review-core wh
 
 Applied together with `qa-review-core`.
 
+## Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/review.py` | Deterministic patterns for the Selenium/Java-specific rules below (`Thread.sleep`, empty catch, commented assertions, and empty `@Test` bodies are already covered generically by `qa-review-core/scripts/review.py`). Merged by `engine.py` when this overlay is selected (detected via a Maven/Gradle build file). Review findings come only from these scripts — never from an LLM. |
+
 ## Critical
 
 - **`Thread.sleep(...)`** — blind wait, primary cause of flakiness. Use

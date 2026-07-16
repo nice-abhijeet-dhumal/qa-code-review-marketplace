@@ -13,6 +13,12 @@ This overlay is added **in addition to** the driver overlay. Example stacks:
 So all driver-level rules still apply inside step definitions; the rules here
 are specific to Gherkin and the feature/step boundary.
 
+## Scripts
+
+| Script | Purpose |
+|--------|---------|
+| `scripts/review.py` | Deterministic patterns, split by file kind: `FEATURE_*_PATTERNS` run against `.feature` files, `STEP_*_PATTERNS` run against step-definition source files (path/name heuristics). Loaded additively by `engine.py` alongside `qa-review-core` and the active driver overlay whenever any `.feature` file exists in the repo. Review findings come only from this script — never from an LLM. |
+
 ## High
 
 - **Business logic / assertions written in `.feature` files.** Gherkin describes
