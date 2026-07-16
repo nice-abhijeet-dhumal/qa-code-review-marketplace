@@ -40,7 +40,7 @@ Score starts at 100. Verdict: `>=90` Approve, `75-89` Approve with comments,
 4. **No real assertions commented out.** A disabled assertion is a silent gap. (Critical)
 5. **No empty test bodies.** A test with no steps passes meaninglessly. (Critical)
 6. **No hardcoded secrets.** Passwords, tokens, API keys, or credentials in
-   source. Use config/env/secret stores. Encrypted vault values are allowed. (High)
+   source. Use config/env/secret stores. Encrypted vault values are allowed. (Critical)
 7. **No hardcoded environment URLs** in test/page code — import from config. (High)
 8. **Skipped tests need a ticket reference** (e.g. `LV-1234`, `JIRA-xxx`) in a
    comment, so the skip is tracked. (High)
