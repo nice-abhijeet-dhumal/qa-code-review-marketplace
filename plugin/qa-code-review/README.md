@@ -204,8 +204,11 @@ Request → Script mapping and every configuration variable.
 - **PR/MR-level**: `MAX_FIX_ITERATIONS` (default 3) review→fix→re-review rounds, stop at `SCORE_THRESHOLD` (default 80).
 - **API/push-level**: `API_MAX_RETRIES` (default 3) for transient GitHub/GitLab API calls and the fix-commit push.
 - **Agent-level**: the local Claude Code agent flow retries a failed detect→review→fix→push attempt up to 3 times total.
-- **Bot-author guard** — never auto-fixes in response to the bot's own commit.
 - **Verify-before-commit gate** — deterministic Critical/High can only decrease.
+
+Every PR/MR always goes through the full review→findings→comment→LLM fix→re-review
+loop, up to `MAX_FIX_ITERATIONS` (default 3), regardless of who authored the head
+commit — including a prior auto-fix commit from the bot itself.
 
 ## Author
 
