@@ -124,8 +124,9 @@ def build_fixes(findings: List[dict], repo_root: str, standard: str,
             "language": _language_for(rel),
             "must_fix_critical_high": must,
             "findings": [
-                {"severity": f["severity"], "line": f["line"],
-                 "rule": f["rule"], "detail": f.get("code", "")}
+                {"id": f.get("id"), "severity": f["severity"], "line": f["line"],
+                 "rule": f["rule"], "detail": f.get("code", ""),
+                 "suggestion": f.get("suggestion", "")}
                 for f in file_findings
             ],
             "content": p.read_text(encoding="utf-8", errors="ignore"),

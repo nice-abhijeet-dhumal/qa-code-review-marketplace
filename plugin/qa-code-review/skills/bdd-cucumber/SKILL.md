@@ -17,29 +17,29 @@ are specific to Gherkin and the feature/step boundary.
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/review.py` | Deterministic patterns, split by file kind: `FEATURE_*_PATTERNS` run against `.feature` files, `STEP_*_PATTERNS` run against step-definition source files (path/name heuristics). Loaded additively by `deterministic_review.py` alongside `qa-review-core` and the active driver overlay whenever any `.feature` file exists in the repo. Review findings come only from this script — never from an LLM. |
+| `scripts/review.py` | Deterministic patterns, split by file kind: `FEATURE_*_PATTERNS` run against `.feature` files, `STEP_*_PATTERNS` run against step-definition source files (path/name heuristics). Each pattern is a `Check(id, rule, suggestion, regex, scope, flags)` namedtuple, same shape as every other skill. Loaded additively by `deterministic_review.py` alongside `qa-review-core` and the active driver overlay whenever any `.feature` file exists in the repo. Review findings come only from this script — never from an LLM. |
 
 ## High
 
 - **Business logic / assertions written in `.feature` files.** Gherkin describes
   behaviour, not implementation. Steps like `Then I click the button with id x`
-  leak UI detail into the spec — keep steps declarative.
+  leak UI detail into the spec — keep steps declarative. (`BDD-FEATURE-UI-LEAK`)
 - **Step definitions containing locators or waits directly** — the step should
-  call a page object / driver action, not embed `By`/`page.locator`/sleeps.
+  call a page object / driver action, not embed `By`/`page.locator`/sleeps. (`BDD-STEP-LOCATOR`, `BDD-STEP-WAIT`)
 - **Shared mutable state between steps via static/global fields** — flaky across
-  scenarios; use scenario scope / dependency injection (PicoContainer, etc.).
+  scenarios; use scenario scope / dependency injection (PicoContainer, etc.). (`BDD-STEP-STATIC-FIELD`)
 
 ## Medium
 
-- **Scenarios without tags** (`@smoke`, `@regression`) — cannot be filtered in CI.
+- **Scenarios without tags** (`@smoke`, `@regression`) — cannot be filtered in CI. (`BDD-FEATURE-TAG-INSIGHT`)
 - **Hardcoded data in Gherkin** that should be a `Scenario Outline` `Examples`
-  table or external test data.
+  table or external test data. (`BDD-FEATURE-HARDCODE`)
 - **Multiple `@Before` hooks** in the same step-definition file — consider
-  consolidating, or verify the ordering is genuinely intentional.
+  consolidating, or verify the ordering is genuinely intentional. (`BDD-STEP-MULTI-BEFORE`)
 
 ## Low
 
-- Feature files without a clear `Feature:` narrative (As a / I want / So that).
+- Feature files without a clear `Feature:` narrative (As a / I want / So that). (`BDD-FEATURE-NARRATIVE`)
 
 > **Not currently automated:** ambiguous/duplicate step definitions (needs
 > cross-file matching), `Background` overuse, Given/When/Then ordering, and

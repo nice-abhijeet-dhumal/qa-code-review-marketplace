@@ -130,8 +130,93 @@ def _file_level_findings(file_path: str) -> list:
     return findings
 
 
+_CRYPTO_VAULT = re.compile(r"""['"]U2FsdGVkX1[A-Za-z0-9+/]+=*['"]""")
+_PAGE_OR_LOCATOR_TYPE = re.compile(r"\b(Page|Locator)\b")
+_AWAIT_RETURN_VOID = re.compile(r"\b(await|return|void)\b")
+
+# Non-descriptive test title detection (id "PW-NONDESC-TITLE") -- a shared,
+# engine-level check like nested-test detection above: it needs a denylist
+# lookup, which a single declarative regex Check can't express, so it lives
+# here rather than in a skill's scripts/review.py. Runs whenever a file is a
+# Playwright spec (is_spec_file), regardless of which driver skill is active.
+_NONDESC_TITLE = re.compile(r"""\b(?:test|it)\s*\(\s*(['"])(.*?)\1""", re.IGNORECASE)
+_NONDESC_TITLE_DENYLIST = {
+    "test", "tests", "test1", "test2", "works", "foo", "bar", "baz",
+    "temp", "tmp", "todo", "sample", "demo", "asdf", "abc", "xyz",
+    "new test", "untitled", "wip", "check",
+}
+_NONDESC_TITLE_GENERIC = re.compile(r"^test\s*\d*$", re.IGNORECASE)
+
+
+def _scope_allows(scope, is_spec_file: bool, is_page_object: bool, file_path: str) -> bool:
+    """Whether a Check's `scope` field permits it to run against this file.
+
+    Values: "any" (default, no restriction) | "spec" (only spec/test files) |
+    "page_object" (only page objects) | "not_page_object" (only outside page
+    objects) | "not_pages_dir" (only outside a pages/ directory, by path).
+    """
+    if not scope or scope == "any":
+        return True
+    if scope == "spec":
+        return is_spec_file
+    if scope == "page_object":
+        return is_page_object
+    if scope == "not_page_object":
+        return not is_page_object
+    if scope == "not_pages_dir":
+        return "pages/" not in file_path
+    return True
+
+
+def _flag_excludes(flags, code: str, match: "re.Match") -> bool:
+    """Whether a Check's `flags` mean this particular match should be
+    suppressed, given the full line and where the match landed.
+
+    - "no_await": only the CURRENT STATEMENT counts as "handled" -- the prefix
+      is scoped back to the last statement boundary (`;`/`{`/`}`) before the
+      match, not the whole line. This matters in both directions: an
+      unrelated await/return/void in an EARLIER statement on the same line
+      (e.g. `const x = await bar(); page.click(...)`) must not suppress a
+      genuinely unawaited call later on the line, and one in a LATER
+      statement (e.g. `page.click(...); const y = await foo();`) must not
+      suppress it either. Checking the whole line (either direction) produces
+      false negatives; checking only the unscoped prefix fixes the "later"
+      direction but not the "earlier" one -- scoping to the statement fixes
+      both.
+    - "defer_ok": combined with no_await, also treats an assignment (`=`) or
+      `Promise.all` anywhere on the line as handled -- the idiomatic
+      assign-then-await-later / Promise.all pattern for event-wait promises.
+    - "skip_crypto": suppress when the matched value is a CryptoJS-encrypted
+      vault string (SKILL.md explicitly allows encrypted values).
+    - "skip_if_pagetype": suppress when the line also references a Page/Locator
+      type (legitimate type-only import in a page object file).
+    """
+    flags = flags or ()
+    if "no_await" in flags:
+        prefix = code[:match.start()]
+        statement_start = max(prefix.rfind(";"), prefix.rfind("{"), prefix.rfind("}")) + 1
+        scoped_prefix = prefix[statement_start:]
+        handled = bool(_AWAIT_RETURN_VOID.search(scoped_prefix))
+        if "defer_ok" in flags:
+            handled = handled or ("=" in scoped_prefix) or ("Promise.all" in code)
+        if handled:
+            return True
+    if "skip_crypto" in flags and _CRYPTO_VAULT.search(code):
+        return True
+    if "skip_if_pagetype" in flags and _PAGE_OR_LOCATOR_TYPE.search(code):
+        return True
+    return False
+
+
 def _check_line(code: str, file_path: str, line_number: int, is_page_object: bool, patterns: dict) -> list:
-    """Run all merged pattern checks against a single line of code."""
+    """Run all merged Check patterns against a single line of code.
+
+    Each Check (see a skill's scripts/review.py) carries: id, rule,
+    suggestion, regex, scope, flags. Severity is implied by which bucket
+    (critical/high/medium/low) the Check lives in -- except "waitForTimeout"
+    -style checks flagged with the "downgrade_medium_in_page_object" flag,
+    which fire as Medium instead of Critical inside a page object.
+    """
     findings = []
     is_spec_file = file_path.endswith(".spec.ts") or file_path.endswith(".spec.js")
     is_feature = file_path.endswith(".feature")
@@ -144,50 +229,29 @@ def _check_line(code: str, file_path: str, line_number: int, is_page_object: boo
     low = patterns["low"] + (patterns["feature_low"] if is_feature else []) \
         + (patterns["step_low"] if _is_step_definition_file(file_path) else [])
 
-    for pattern, rule_name in critical:
-        if "without Page type" in rule_name and not is_page_object:
-            continue
-        if re.search(pattern, code, re.IGNORECASE):
-            if "missing await" in rule_name and "await" in code:
+    for severity, checks in (("Critical", critical), ("High", high),
+                              ("Medium", medium), ("Low", low)):
+        for check in checks:
+            if not _scope_allows(check.scope, is_spec_file, is_page_object, file_path):
                 continue
-            if "hardcoded credential" in rule_name and re.search(r"['\"]U2FsdGVkX1[A-Za-z0-9+/]+=*['\"]", code):
+            match = re.search(check.regex, code, re.IGNORECASE)
+            if not match:
                 continue
-            if "without Page type" in rule_name and re.search(r"\b(Page|Locator)\b", code):
+            if _flag_excludes(check.flags, code, match):
                 continue
-            if "waitForTimeout" in rule_name and is_page_object:
-                findings.append({"severity": "Medium", "file": file_path, "line": line_number,
-                                  "rule": rule_name + " (consider replacing with locator.waitFor())",
-                                  "code": code.strip()[:120]})
-            else:
-                findings.append({"severity": "Critical", "file": file_path, "line": line_number,
-                                  "rule": rule_name, "code": code.strip()[:120]})
 
-    for pattern, rule_name in high:
-        if "Value assertion found" in rule_name and not is_page_object:
-            continue
-        if "Assertion found in Page Object" in rule_name and not is_page_object:
-            continue
-        if "page.locator() used in spec file" in rule_name and not is_spec_file:
-            continue
-        if "without Page type" in rule_name and not is_page_object:
-            continue
-        if re.search(pattern, code, re.IGNORECASE):
-            if "without Page type" in rule_name and re.search(r"\b(Page|Locator)\b", code):
-                continue
-            findings.append({"severity": "High", "file": file_path, "line": line_number,
-                              "rule": rule_name, "code": code.strip()[:120]})
+            flags = check.flags or ()
+            rule = check.rule
+            actual_severity = severity
+            if "downgrade_medium_in_page_object" in flags and is_page_object:
+                actual_severity = "Medium"
+                rule = rule + " (consider replacing with locator.waitFor())"
 
-    for pattern, rule_name in medium:
-        if "Page class detected" in rule_name and "pages/" in file_path:
-            continue
-        if re.search(pattern, code, re.IGNORECASE):
-            findings.append({"severity": "Medium", "file": file_path, "line": line_number,
-                              "rule": rule_name, "code": code.strip()[:120]})
-
-    for pattern, rule_name in low:
-        if re.search(pattern, code, re.IGNORECASE):
-            findings.append({"severity": "Low", "file": file_path, "line": line_number,
-                              "rule": rule_name, "code": code.strip()[:120]})
+            findings.append({
+                "id": check.id, "severity": actual_severity, "file": file_path,
+                "line": line_number, "rule": rule, "code": code.strip()[:120],
+                "suggestion": check.suggestion,
+            })
 
     return findings
 
@@ -233,9 +297,23 @@ def analyze_file_content(content: str, file_path: str, patterns: dict) -> list:
                     test_brace_depth = brace_depth
                 else:
                     findings.append({
-                        "severity": "Critical", "file": file_path, "line": line_number,
+                        "id": "PW-NESTED-TEST", "severity": "Critical", "file": file_path,
+                        "line": line_number,
                         "rule": "Nested test() detected -- Playwright does not support tests nested inside other tests",
                         "code": raw_line.strip()[:120],
+                        "suggestion": "Playwright does not support tests nested inside tests; use test.describe() to group.",
+                    })
+
+            match = _NONDESC_TITLE.search(raw_line)
+            if match:
+                title = match.group(2).strip()
+                if title == "" or title.lower() in _NONDESC_TITLE_DENYLIST or _NONDESC_TITLE_GENERIC.match(title):
+                    findings.append({
+                        "id": "PW-NONDESC-TITLE", "severity": "Low", "file": file_path,
+                        "line": line_number,
+                        "rule": "Insight: non-descriptive test title -- name the behaviour under test",
+                        "code": raw_line.strip()[:120],
+                        "suggestion": "Name the behaviour under test so reports/failures read clearly.",
                     })
 
             brace_depth += stripped.count("{") - stripped.count("}")
@@ -310,8 +388,12 @@ def format_report(findings: list, score: int, verdict: str, context_info: dict) 
         else:
             out += f"### {label}\n\n"
         for f in items:
-            out += f"- **`{f['file']}:{f['line']}`** -- {f['rule']}\n"
+            check_id = f.get("id")
+            id_prefix = f"`{check_id}` " if check_id else ""
+            out += f"- {id_prefix}**`{f['file']}:{f['line']}`** -- {f['rule']}\n"
             out += f"  ```\n  {f['code']}\n  ```\n"
+            if f.get("suggestion"):
+                out += f"  *Suggestion:* {f['suggestion']}\n"
         if collapsed:
             out += "\n</details>\n"
         out += "\n"
