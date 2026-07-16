@@ -150,8 +150,6 @@ def _check_line(code: str, file_path: str, line_number: int, is_page_object: boo
         if re.search(pattern, code, re.IGNORECASE):
             if "missing await" in rule_name and "await" in code:
                 continue
-            if "hardcoded credential" in rule_name and re.search(r"['\"]U2FsdGVkX1[A-Za-z0-9+/]+=*['\"]", code):
-                continue
             if "without Page type" in rule_name and re.search(r"\b(Page|Locator)\b", code):
                 continue
             if "waitForTimeout" in rule_name and is_page_object:
@@ -172,6 +170,8 @@ def _check_line(code: str, file_path: str, line_number: int, is_page_object: boo
         if "without Page type" in rule_name and not is_page_object:
             continue
         if re.search(pattern, code, re.IGNORECASE):
+            if "hardcoded credential" in rule_name and re.search(r"['\"]U2FsdGVkX1[A-Za-z0-9+/]+=*['\"]", code):
+                continue
             if "without Page type" in rule_name and re.search(r"\b(Page|Locator)\b", code):
                 continue
             findings.append({"severity": "High", "file": file_path, "line": line_number,
