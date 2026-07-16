@@ -32,18 +32,40 @@ easier to ship and matter more.
 - **Deprecated APIs:** `$()`, `$$()`, `page.waitForSelector()`.
 - **`page.waitForNavigation()` without `Promise.all`.**
 - **`beforeAll` with the page fixture** — shared state across workers.
+- **`page.evaluate()` with hardcoded JS or an inline arrow function** —
+  bypasses auto-retry; use locator actions.
+- **Hardcoded test data in a spec file** (`page.fill`/`.type` with a literal
+  string) — use test data or config instead.
+- **Playwright test framework imported without a `Page`/`Locator` type** in a
+  page object file — verify this import is actually needed there.
 
 ## Medium
 
-- **Missing/incorrect JSDoc types** where the project relies on `// @ts-check`
-  or JSDoc for editor safety.
 - **`page.reload()` without a follow-up assertion.**
 - **Debug `console.log`** left in code.
+- **Always-on `page.screenshot()`** — gate behind failure hooks.
+- **`page` passed as a parameter to a helper function** — consider a fixture
+  or POM method instead.
+- **`await` inside `expect()`** for async getters
+  (`expect(await page.title())`) — hoist the await:
+  `const val = await page.title(); expect(val)...`.
 
 ## Low
 
 - `test.only` / `describe.only` committed.
 - Missing `@tag` annotations.
+- `test.setTimeout()` inside a test — set the timeout globally in
+  `playwright.config.js` instead.
+- `page.fill(selector, value)` — the older API; prefer `locator.fill()`.
+- Empty or missing `describe()` label.
+- `getByRole`/`getByTestId`/`getByText`/`getByLabel`/`getByPlaceholder`/
+  `getByAltText`/`getByTitle` — consider `page.locator()` with a CSS selector
+  per this repo's locator strategy.
+
+> **Not currently automated:** missing/incorrect JSDoc types (where a project
+> relies on `// @ts-check` or JSDoc for editor safety) requires type-level
+> reasoning the regex engine can't do. Treat as manual-review guidance, not a
+> pipeline check.
 
 ## Conventions
 

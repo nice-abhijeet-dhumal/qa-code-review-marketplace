@@ -52,6 +52,17 @@ Score starts at 100. Verdict: `>=90` Approve, `75-89` Approve with comments,
     absolute XPath, or auto-generated dynamic IDs. Prefer stable attributes. (High)
 12. **Track TODO/FIXME/HACK** with a ticket reference. (Low)
 
+## Additional checks (Medium)
+
+Implementation-level checks not tied to a specific numbered rule above:
+
+- **Config import path convention.** Imports from `../../config` must come
+  from `src/config/stg4` or `src/config/tst2`, not a bare `../../config`.
+- **Page class location.** A class named `*Page` should live under a
+  `pages/`/`page-objects/` folder.
+- **Non-ASCII characters in comments.** Keep comments plain ASCII (box-drawing
+  separators and em/en-dashes are excluded as common intentional decorators).
+
 ## Review / fix contract
 
 - **Review (deterministic, no LLM):** `deterministic_review.py` detects the framework, loads

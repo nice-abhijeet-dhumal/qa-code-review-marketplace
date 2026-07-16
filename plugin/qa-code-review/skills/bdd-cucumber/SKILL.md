@@ -26,24 +26,26 @@ are specific to Gherkin and the feature/step boundary.
   leak UI detail into the spec — keep steps declarative.
 - **Step definitions containing locators or waits directly** — the step should
   call a page object / driver action, not embed `By`/`page.locator`/sleeps.
-- **Ambiguous or duplicate step definitions** — two glue methods matching the
-  same phrase; Cucumber errors or picks unpredictably.
 - **Shared mutable state between steps via static/global fields** — flaky across
   scenarios; use scenario scope / dependency injection (PicoContainer, etc.).
 
 ## Medium
 
 - **Scenarios without tags** (`@smoke`, `@regression`) — cannot be filtered in CI.
-- **`Background` overused** to hide long setup — prefer explicit, readable steps
-  or hooks.
 - **Hardcoded data in Gherkin** that should be a `Scenario Outline` `Examples`
   table or external test data.
-- **Given/When/Then out of order** or multiple `When`s masking missing structure.
+- **Multiple `@Before` hooks** in the same step-definition file — consider
+  consolidating, or verify the ordering is genuinely intentional.
 
 ## Low
 
-- Inconsistent Gherkin phrasing for the same action (hurts step reuse).
 - Feature files without a clear `Feature:` narrative (As a / I want / So that).
+
+> **Not currently automated:** ambiguous/duplicate step definitions (needs
+> cross-file matching), `Background` overuse, Given/When/Then ordering, and
+> inconsistent Gherkin phrasing all require whole-suite or semantic reasoning
+> this line-based regex engine can't do reliably. Treat these as manual-review
+> guidance, not pipeline checks.
 
 ## Conventions
 
